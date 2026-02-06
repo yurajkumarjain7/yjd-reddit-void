@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Reddit Void: Daily Reveal</title>
+    <style>
+        :root { --reddit-orange: #FF4500; --void-bg: #1A1A1B; --hint-blue: #0079D3; }
+        body { 
+            margin: 0; background-color: var(--void-bg); 
+            color: white; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; overflow: hidden;
+        }
+        #game-header { text-align: center; margin-bottom: 10px; }
+        #canvas-container { position: relative; border: 2px solid #333; border-radius: 8px; cursor: crosshair; }
+        canvas { display: block; border-radius: 6px; background: #000; max-width: 90vw; max-height: 50vh; }
+        
+        #ui-layer { width: 90vw; max-width: 500px; margin-top: 15px; display: flex; flex-direction: column; gap: 10px; }
+        
+        /* Free Hint Section */
+        #hint-box { 
+            background: #272729; border-left: 4px solid var(--hint-blue); 
+            padding: 12px; font-size: 13px; color: #D7DADC;
+            display: flex; flex-direction: column; gap: 8px;
+        }
+        .hint-controls { display: flex; align-items: center; justify-content: space-between; }
+        .community-note { font-style: italic; color: #818384; font-size: 11px; border-top: 1px solid #343536; pt: 5px; }
+
+        .stats { display: flex; justify-content: space-between; font-size: 14px; color: #818384; font-weight: bold; }
+        .input-group { display: flex; gap: 8px; }
+        
+        input { 
+            flex: 1; background: #272729; border: 1px solid #343536; color: white; 
+            padding: 12px; border-radius: 4px; outline: none;
+        }
+        button { 
+            background: var(--reddit-orange); border: none; color: white; 
+            padding: 10px 20px; border-radius: 999px; font-weight: bold; cursor: pointer;
+        }
+        .btn-hint { background: var(--hint-blue); font-size: 11px; padding: 6px 15px; }
+        #toast { 
+            position: fixed; bottom: 20px; background: white; 
+            color: black; padding: 10px 20px; border-radius: 5px; display: none; z-index: 100;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="game-header">
+        <h2 style="margin:0; color:var(--reddit-orange)">THE VOID</h2>
+        <p style="margin:5px 0; font-size: 12px; color:#818384;">Uncover the pixels. Solve as a community.</p>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <div id="ui-layer">
+        <div id="hint-box">
+            <div class="hint-controls">
+                <span id="hintText">Need a hand? Hints are free today.</span>
+                <button id="hintBtn" class="btn-hint">REVEAL HINT</button>
+            </div>
+            <div class="community-note">
+                💡 Stuck? Check the <b>Reddit Comments</b> for shared clues!
+            </div>
+        </div>
+
+        <div class="stats">
+            <span>CHARGES: <span id="clicks">5</span></span>
+            <span>REVEALED: <span id="percent">0</span>%</span>
+        </div>
+
+        <div class="input-group">
+            <input type="text" id="guessInput" placeholder="Enter your guess...">
+            <button id="guessBtn">GUESS</button>
+        </div>
+    </div>
+
+    <div id="toast"></div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const clickEl = document.getElementById('clicks');
+        const percentEl = document.getElementById('percent');
+        const guessInput = document.getElementById('guessInput');
+        const guessBtn = document.getElementById('guessBtn');
+        const hintBtn = document.getElementById('hintBtn');
+        const hintText = document.getElementById('hintText');
+        const toast = document.getElementById('toast');
+
+        let totalClicks = 0;
+        let clicksRemaining = 5;
+        const secretSolution = "snoo"; 
+        
+        // Clues stay simple here; "harder" clues are left for the comments
+        const hints = [
+            "It's a legendary Reddit mascot.",
+            "He lives in the top-left of your screen.",
+            "His name starts with 'S' and ends with 'O'."
+        ];
+        let hintIndex = 0;
+
+        const dailyImg = new Image();
+        dailyImg.src = 'https://i.redd.it/snoovatar/avatars/2da69176-023a-4934-bc94-1386708b73f7.png';
+        
+        let revealedPath = new Path2D();
+
+        dailyImg.onload = () => {
+            canvas.width = 500;
+            canvas.height = 500;
+            draw();
+        };
+
+        function draw() {
+            ctx.fillStyle = '#000';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.save();
+            ctx.clip(revealedPath);
+            ctx.drawImage(dailyImg, 0, 0, canvas.width, canvas.height);
+            ctx.restore();
+        }
+
+        canvas.addEventListener('mousedown', (e) => {
+            if (clicksRemaining <= 0) {
+                showToast("No charges left! Work with others in the comments.");
+                return;
+            }
+
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX - rect.left) * (canvas.width / rect.width);
+            const y = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+            revealedPath.moveTo(x + 45, y);
+            revealedPath.arc(x, y, 45, 0, Math.PI * 2);
+            
+            clicksRemaining--;
+            totalClicks++;
+            clickEl.innerText = clicksRemaining;
+            percentEl.innerText = Math.min(100, totalClicks * 5); 
+            draw();
+        });
+
+        // Hint Button is now always available
+        hintBtn.onclick = () => {
+            if (hintIndex < hints.length) {
+                hintText.innerText = hints[hintIndex];
+                hintIndex++;
+                if (hintIndex === hints.length) {
+                    hintBtn.innerText = "NO MORE HINTS";
+                    hintBtn.style.opacity = "0.5";
+                }
+            }
+        };
+
+        guessBtn.onclick = () => {
+            const val = guessInput.value.toLowerCase().trim();
+            if (val === secretSolution) {
+                showToast("CORRECT! You've revealed the mystery.");
+                revealedPath.rect(0, 0, canvas.width, canvas.height);
+                draw();
+            } else {
+                showToast("Not quite. Search the comments for the answer!");
+            }
+        };
+
+        function showToast(msg) {
+            toast.innerText = msg;
+            toast.style.display = 'block';
+            setTimeout(() => { toast.style.display = 'none'; }, 3000);
+        }
+    </script>
+</body>
+</html>
